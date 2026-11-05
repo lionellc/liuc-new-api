@@ -44,3 +44,18 @@ relaykit/relayconvert/chat_responses_live_local_test.go
 service/openaicompat/chat_responses_live_local_test.go
 go.work
 go.work.sum
+
+# Independent-site deployment secrets and runtime state.
+**/.env.*
+!**/.env.example
+**/node.env
+**/app.env
+**/release.env
+**/release.env.*
+**/.release.*
+**/.init-site.*
+**/.deploy.lock
+**/deployment-history.log
+**/backups/
+**/*.pem
+**/*.key

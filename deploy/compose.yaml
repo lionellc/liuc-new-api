@@ -1,0 +1,90 @@
+# Each server hosts an independent new-api site; no state is shared across sites.
+name: liuc-new-api
+
+services:
+  new-api:
+    image: ${NEW_API_IMAGE:?set NEW_API_IMAGE}
+    restart: unless-stopped
+    command: ["--log-dir", "/app/logs"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - path: ./app.env
+        format: raw
+    environment:
+      NODE_TYPE: master
+      SQL_DSN: "postgresql://newapi:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/newapi"
+      REDIS_CONN_STRING: "redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379/0"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 150s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O - http://127.0.0.1:3000/api/status
+          | grep -Eq '"success"[[:space:]]*:[[:space:]]*true'
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    logging: &container-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: newapi
+      POSTGRES_USER: newapi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newapi -d newapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *container-logging
+
+  redis:
+    image: redis:7.4
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG'
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *container-logging
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${DOCKER_SUBNET:?set DOCKER_SUBNET}
+          gateway: ${DOCKER_GATEWAY:?set DOCKER_GATEWAY}

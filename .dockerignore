@@ -10,3 +10,20 @@ docs
 /web/node_modules
 /web/dist
 !THIRD-PARTY-LICENSES.md
+
+# Independent-site deployment configuration is never part of the application image.
+deploy
+**/.env
+**/.env.*
+!**/.env.example
+**/node.env
+**/app.env
+**/release.env
+**/release.env.*
+**/.release.*
+**/.init-site.*
+**/backups/
+**/*.pem
+**/*.key
+/data/
+/logs/

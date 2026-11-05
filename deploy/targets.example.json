@@ -1,0 +1,16 @@
+[
+  {
+    "name": "site-a",
+    "host": "node-a.example.com",
+    "port": 22,
+    "user": "deploy",
+    "ssh_key_secret": "SITE_A_SSH_KEY"
+  },
+  {
+    "name": "site-b",
+    "host": "node-b.example.com",
+    "port": 22,
+    "user": "deploy",
+    "ssh_key_secret": "SITE_B_SSH_KEY"
+  }
+]

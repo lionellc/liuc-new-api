@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  workflow_call:
+
   pull_request:
     types: [opened, synchronize, closed]
 
@@ -26,7 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          repository: ${{ github.event.pull_request.base.repo.full_name }}
+          repository: ${{ github.repository }}
           ref: ${{ github.sha }}
 
       - name: Set up Go
@@ -81,7 +83,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          repository: ${{ github.event.pull_request.base.repo.full_name }}
+          repository: ${{ github.repository }}
           ref: ${{ github.sha }}
 
       - name: Set up Bun
@@ -97,3 +99,37 @@ jobs:
 
       - name: Test
         run: bun run test
+
+  deployment:
+    name: Deployment configuration validation
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+
+      - name: Validate shell scripts and site list
+        run: |
+          set -Eeuo pipefail
+          for script in deploy/*.sh; do
+            bash -n "$script"
+          done
+          DEPLOY_TARGETS="$(cat deploy/targets.example.json)" \
+            bash deploy/select-targets.sh all > /dev/null
+
+      - name: Validate generated Docker Compose configuration
+        run: |
+          set -Eeuo pipefail
+          site_dir="$(mktemp -d)"
+          trap 'rm -rf "$site_dir"' EXIT
+          cp deploy/compose.yaml deploy/init-site.sh deploy/*.env.example "$site_dir/"
+          bash "$site_dir/init-site.sh" ci-site https://ci.example.com
+          NEW_API_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:ci" \
+            docker compose \
+              --env-file "$site_dir/node.env" \
+              -f "$site_dir/compose.yaml" \
+              config --quiet
